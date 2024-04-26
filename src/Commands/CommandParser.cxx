@@ -44,6 +44,40 @@
 
 #include <iostream>
 
+static caret::AString stringToJSON(const caret::AString& in) {
+    caret::AString out;
+    int in_len = in.length();
+    for (int i = 0; i < in_len; ++i) {
+        const auto ch = in.at(i);
+        switch (ch.toLatin1()) {
+        case '\b':
+            out.append("\\b");
+            break;
+        case '\f':
+            out.append("\\f");
+            break;
+        case '\n':
+            out.append("\\n");
+            break;
+        case '\r':
+            out.append("\\r");
+            break;
+        case '\t':
+            out.append("\\t");
+            break;
+        case '"':
+            out.append("\\\"");
+            break;
+        case '\\':
+            out.append("\\\\");
+            break;
+        default:
+            out.append(ch);
+        }
+    }
+    return out;
+}
+
 using namespace caret;
 using namespace std;
 
@@ -870,6 +904,106 @@ void CommandParser::writeOutput(const vector<OutputAssoc>& outAssociation)
     }
 }
 
+static AString indentStr(int num)
+{
+    AString space(" ");
+    return space.repeated(num);
+}
+
+static AString abstractParameterToJSON(AbstractParameter* myParam, int indent)
+{
+    AString ret;
+    ret += indentStr(indent) + "\"key\": " + AString::number(myParam->m_key) + ",\n";
+    ret += indentStr(indent) + "\"short_name\": \"" + myParam->m_shortName + "\",\n";
+    ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myParam->m_description) + "\",\n";
+    ret += indentStr(indent) + "\"type\": \"" + OperationParametersEnum::toName(myParam->getType()) + "\"\n";
+    return ret;
+}
+
+static AString parameterComponentToJSON(ParameterComponent* myComponent, int indent)
+{
+    /*
+        std::vector<AbstractParameter*> m_paramList;//mandatory arguments
+        std::vector<AbstractParameter*> m_outputList;//should this be a different type? input and output parameters are very similar, just pointers to files
+        std::vector<OptionalParameter*> m_optionList;//optional arguments
+        std::vector<RepeatableOption*> m_repeatableOptions;//repeatable options
+    */
+
+
+    AString ret;
+
+    // std::vector<AbstractParameter*> m_paramList;//mandatory arguments
+    ret += indentStr(indent) + "\"params\": [\n";
+    indent += 2;
+    for (int i = 0; i < (int)myComponent->m_paramList.size(); ++i)
+    {
+        ret += indentStr(indent) + "{\n";
+        indent += 2;
+        ret += abstractParameterToJSON(myComponent->m_paramList[i], indent);
+        indent -= 2;
+        ret += indentStr(indent) + "},\n";
+    }
+    indent -= 2;
+    ret += indentStr(indent) + "],\n";
+
+    // std::vector<AbstractParameter*> m_outputList;//should this be a different type? input and output parameters are very similar, just pointers to files
+    ret += indentStr(indent) + "\"outputs\": [\n";
+    indent += 2;
+    for (int i = 0; i < (int)myComponent->m_outputList.size(); ++i)
+    {
+        ret += indentStr(indent) + "{\n";
+        indent += 2;
+        ret += abstractParameterToJSON(myComponent->m_outputList[i], indent);
+        indent -= 2;
+        ret += indentStr(indent) + "},\n";
+    }
+    indent -= 2;
+    ret += indentStr(indent) + "],\n";
+
+    // std::vector<OptionalParameter*> m_optionList;//optional arguments
+    // OptionalParameter == OptionalComponent == ParameterComponent
+    ret += indentStr(indent) + "\"options\": [\n";
+    indent += 2;
+    for (int i = 0; i < (int)myComponent->m_optionList.size(); ++i)
+    {
+        ret += indentStr(indent) + "{\n";
+        indent += 2;
+        ret += indentStr(indent) + "\"key\": " + AString::number(myComponent->m_optionList[i]->m_key) + ",\n";
+        ret += indentStr(indent) + "\"option_switch\": \"" + myComponent->m_optionList[i]->m_optionSwitch + "\",\n";
+        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_optionList[i]->m_description) + "\"\n";
+
+        // recurse
+        ret += parameterComponentToJSON(myComponent->m_optionList[i], indent);
+
+        indent -= 2;
+        ret += indentStr(indent) + "},\n";
+    }
+    indent -= 2;
+    ret += indentStr(indent) + "],\n";
+
+    // std::vector<RepeatableOption*> m_repeatableOptions;//repeatable options
+    ret += indentStr(indent) + "\"repeatable_options\": [\n";
+    indent += 2;
+    for (int i = 0; i < (int)myComponent->m_repeatableOptions.size(); ++i)
+    {
+        ret += indentStr(indent) + "{\n";
+        indent += 2;
+        ret += indentStr(indent) + "\"key\": " + AString::number(myComponent->m_repeatableOptions[i]->m_key) + ",\n";
+        ret += indentStr(indent) + "\"option_switch\": \"" + myComponent->m_repeatableOptions[i]->m_template.m_optionSwitch + "\",\n";
+        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_repeatableOptions[i]->m_template.m_description) + "\"\n";
+
+        // recurse
+        ret += parameterComponentToJSON(&(myComponent->m_repeatableOptions[i]->m_template), indent);
+
+        indent -= 2;
+        ret += indentStr(indent) + "},\n";
+    }
+    indent -= 2;
+    ret += indentStr(indent) + "]\n";
+
+    return ret;
+}
+
 AString CommandParser::getHelpInformation(const AString& programName)
 {
     m_minIndent = 0;
@@ -878,14 +1012,48 @@ AString CommandParser::getHelpInformation(const AString& programName)
     m_maxIndent = 31;//don't let indenting take up more than this
     int curIndent = m_minIndent;
     AString ret;
-    ret = formatString(getOperationShortDescription(), curIndent, true);
+    
+    OperationParameters* myAlgParams = m_autoOper->getParameters();
+    ParameterComponent* myComponent = myAlgParams;
+
+    ret = AString("");
+    ret += "{\n";
+    curIndent += 2;
+
+
+    ret += indentStr(curIndent) + "\"command\": \"" + getCommandLineSwitch() + "\",\n";
+    ret += indentStr(curIndent) + "\"short_description\": \"" + getOperationShortDescription() + "\",\n";
+    ret += indentStr(curIndent) + "\"help_text\": \"" + stringToJSON(myAlgParams->getHelpText()) + "\",\n";
+    
+    ret += indentStr(curIndent) + "\"version_info\": [\n";
+    curIndent += m_indentIncrement;
+    {
+        vector<AString> versionInfo;
+        ApplicationInformation myInfo;
+        myInfo.getAllInformation(versionInfo);
+        for (int i = 0; i < (int)versionInfo.size(); ++i)
+        {
+            ret += indentStr(curIndent) + "\"" + stringToJSON(versionInfo[i]) + "\",\n";
+        }
+    }
+    curIndent -= m_indentIncrement;
+    ret += indentStr(curIndent) + "],\n";
+
+    ret += parameterComponentToJSON(myComponent, curIndent);
+
+    curIndent -= 2;
+    ret += indentStr(curIndent) + "}\n";
+
+    /*ret += "---\n";
+
+    ret += formatString(getOperationShortDescription(), curIndent, true);
     curIndent += m_indentIncrement;
     ret += getIndentString(curIndent) + programName + " " + getCommandLineSwitch() + "\n";//DO NOT format the command that people may want to copy and paste, added hyphens would be disastrous
     curIndent += m_indentIncrement;
-    OperationParameters* myAlgParams = m_autoOper->getParameters();
+    //OperationParameters* myAlgParams = m_autoOper->getParameters();
     addComponentDescriptions(ret, myAlgParams, curIndent);
     ret += "\n";//separate prose with a newline
-    addHelpProse(ret, myAlgParams, curIndent);
+    addHelpProse(ret, myAlgParams, curIndent);*/
     delete myAlgParams;
     return ret;
 }
