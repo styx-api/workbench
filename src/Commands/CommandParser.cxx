@@ -941,7 +941,12 @@ static AString parameterComponentToJSON(ParameterComponent* myComponent, int ind
         indent += 2;
         ret += abstractParameterToJSON(myComponent->m_paramList[i], indent);
         indent -= 2;
-        ret += indentStr(indent) + "},\n";
+        ret += indentStr(indent) + "}";
+        if (i != (int)myComponent->m_paramList.size() - 1)
+        {
+            ret += ",";
+        }
+        ret += "\n";
     }
     indent -= 2;
     ret += indentStr(indent) + "],\n";
@@ -955,7 +960,12 @@ static AString parameterComponentToJSON(ParameterComponent* myComponent, int ind
         indent += 2;
         ret += abstractParameterToJSON(myComponent->m_outputList[i], indent);
         indent -= 2;
-        ret += indentStr(indent) + "},\n";
+        ret += indentStr(indent) + "}";
+        if (i != (int)myComponent->m_outputList.size() - 1)
+        {
+            ret += ",";
+        }
+        ret += "\n";
     }
     indent -= 2;
     ret += indentStr(indent) + "],\n";
@@ -970,13 +980,18 @@ static AString parameterComponentToJSON(ParameterComponent* myComponent, int ind
         indent += 2;
         ret += indentStr(indent) + "\"key\": " + AString::number(myComponent->m_optionList[i]->m_key) + ",\n";
         ret += indentStr(indent) + "\"option_switch\": \"" + myComponent->m_optionList[i]->m_optionSwitch + "\",\n";
-        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_optionList[i]->m_description) + "\"\n";
+        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_optionList[i]->m_description) + "\",\n";
 
         // recurse
         ret += parameterComponentToJSON(myComponent->m_optionList[i], indent);
 
         indent -= 2;
-        ret += indentStr(indent) + "},\n";
+        ret += indentStr(indent) + "}";
+        if (i != (int)myComponent->m_optionList.size() - 1)
+        {
+            ret += ",";
+        }
+        ret += "\n";
     }
     indent -= 2;
     ret += indentStr(indent) + "],\n";
@@ -990,13 +1005,18 @@ static AString parameterComponentToJSON(ParameterComponent* myComponent, int ind
         indent += 2;
         ret += indentStr(indent) + "\"key\": " + AString::number(myComponent->m_repeatableOptions[i]->m_key) + ",\n";
         ret += indentStr(indent) + "\"option_switch\": \"" + myComponent->m_repeatableOptions[i]->m_template.m_optionSwitch + "\",\n";
-        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_repeatableOptions[i]->m_template.m_description) + "\"\n";
+        ret += indentStr(indent) + "\"description\": \"" + stringToJSON(myComponent->m_repeatableOptions[i]->m_template.m_description) + "\",\n";
 
         // recurse
         ret += parameterComponentToJSON(&(myComponent->m_repeatableOptions[i]->m_template), indent);
 
         indent -= 2;
-        ret += indentStr(indent) + "},\n";
+        ret += indentStr(indent) + "}";
+        if (i != (int)myComponent->m_repeatableOptions.size() - 1)
+        {
+            ret += ",";
+        }
+        ret += "\n";
     }
     indent -= 2;
     ret += indentStr(indent) + "]\n";
@@ -1021,8 +1041,8 @@ AString CommandParser::getHelpInformation(const AString& programName)
     curIndent += 2;
 
 
-    ret += indentStr(curIndent) + "\"command\": \"" + getCommandLineSwitch() + "\",\n";
-    ret += indentStr(curIndent) + "\"short_description\": \"" + getOperationShortDescription() + "\",\n";
+    ret += indentStr(curIndent) + "\"command\": \"" + stringToJSON(getCommandLineSwitch()) + "\",\n";
+    ret += indentStr(curIndent) + "\"short_description\": \"" + stringToJSON(getOperationShortDescription()) + "\",\n";
     ret += indentStr(curIndent) + "\"help_text\": \"" + stringToJSON(myAlgParams->getHelpText()) + "\",\n";
     
     ret += indentStr(curIndent) + "\"version_info\": [\n";
@@ -1033,7 +1053,11 @@ AString CommandParser::getHelpInformation(const AString& programName)
         myInfo.getAllInformation(versionInfo);
         for (int i = 0; i < (int)versionInfo.size(); ++i)
         {
-            ret += indentStr(curIndent) + "\"" + stringToJSON(versionInfo[i]) + "\",\n";
+            ret += indentStr(curIndent) + "\"" + stringToJSON(versionInfo[i]) + "\"";
+            if (i != (int)versionInfo.size() - 1) {
+                ret += ",";
+            }
+            ret += "\n";
         }
     }
     curIndent -= m_indentIncrement;
